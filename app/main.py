@@ -40,8 +40,12 @@ async def startup_event():
     app_logger.info("Database initialized")
     
     app_logger.info(f"API running on {settings.api_host}:{settings.api_port}")
-    app_logger.info(f"Ollama host: {settings.ollama_host}")
-    app_logger.info(f"Ollama model: {settings.ollama_model}")
+    app_logger.info(f"LLM Provider: {settings.llm_provider}")
+    if settings.llm_provider == "openrouter":
+        app_logger.info(f"OpenRouter model: {settings.openrouter_model}")
+    else:
+        app_logger.info(f"Ollama host: {settings.ollama_host}")
+        app_logger.info(f"Ollama model: {settings.ollama_model}")
 
 
 @app.on_event("shutdown")
