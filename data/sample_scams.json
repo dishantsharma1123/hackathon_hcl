@@ -1,0 +1,59 @@
+{
+  "sample_scams": [
+    {
+      "type": "lottery_prize",
+      "message": "Congratulations! You've won Rs. 50,000 in our lottery. To claim, send Rs. 500 to this UPI ID: winner@paytm",
+      "expected_extraction": {
+        "upi_ids": ["winner@paytm"]
+      }
+    },
+    {
+      "type": "phishing",
+      "message": "Your bank account will be blocked. Update your KYC by clicking: http://secure-bank-verify.com/login",
+      "expected_extraction": {
+        "phishing_urls": ["http://secure-bank-verify.com/login"]
+      }
+    },
+    {
+      "type": "financial_fraud",
+      "message": "I'm from the income tax department. You have a refund pending. Share your bank details: account number and IFSC",
+      "expected_extraction": {
+        "bank_accounts": true
+      }
+    },
+    {
+      "type": "financial_fraud",
+      "message": "Work from home! Earn Rs. 30,000/month. Pay Rs. 2000 registration fee to: jobportal@icici",
+      "expected_extraction": {
+        "upi_ids": ["jobportal@icici"]
+      }
+    },
+    {
+      "type": "phishing",
+      "message": "Your Amazon order is on hold. Confirm payment here: bit.ly/amazon-secure-verify",
+      "expected_extraction": {
+        "phishing_urls": ["bit.ly/amazon-secure-verify"]
+      }
+    },
+    {
+      "type": "tech_support",
+      "message": "Your computer has a virus. Call us immediately at +91-9876543210 to fix it",
+      "expected_extraction": {
+        "phone_numbers": ["9876543210"]
+      }
+    },
+    {
+      "type": "financial_fraud",
+      "message": "Transfer Rs. 10,000 to account 123456789012 (IFSC: SBIN0001234) for guaranteed returns",
+      "expected_extraction": {
+        "bank_accounts": ["123456789012"],
+        "ifsc_codes": ["SBIN0001234"]
+      }
+    },
+    {
+      "type": "legitimate",
+      "message": "Hi, how are you doing today?",
+      "expected_extraction": {}
+    }
+  ]
+}
