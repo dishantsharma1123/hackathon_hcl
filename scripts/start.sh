@@ -32,6 +32,6 @@ fi
 
 # Start the FastAPI application
 echo "Starting FastAPI server..."
-# Use LOG_LEVEL if set, default to INFO
-LOG_LEVEL="${LOG_LEVEL:-INFO}"
+# Use LOG_LEVEL if set, default to INFO (lowercase)
+LOG_LEVEL="${LOG_LEVEL:-info}"
 exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level $LOG_LEVEL
