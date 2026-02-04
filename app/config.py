@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # API Configuration
-    api_key: str
+    api_key: str = "test_api_key_12345"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 
