@@ -46,6 +46,12 @@ async def startup_event():
     else:
         app_logger.info(f"Ollama host: {settings.ollama_host}")
         app_logger.info(f"Ollama model: {settings.ollama_model}")
+    
+    # Give database time to initialize
+    import asyncio
+    await asyncio.sleep(0.5)
+    
+    app_logger.info("Application startup complete.")
 
 
 @app.on_event("shutdown")
