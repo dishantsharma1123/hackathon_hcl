@@ -9,12 +9,18 @@ echo "Starting Agentic Honey-Pot System..."
 # Start FastAPI application
 echo "Starting FastAPI server..."
 
-# Use LOG_LEVEL if set, default to info. 
-# Convert to lowercase because uvicorn requires 'info', 'debug' etc. (not 'INFO')
-LOG_LEVEL="${LOG_LEVEL:-info}"
-LOG_LEVEL=$(echo "$LOG_LEVEL" | tr '[:upper:]' '[:lower:]')
-
 # Use PORT provided by Railway, default to 8000 if not set
 PORT="${PORT:-8000}"
 
-exec uvicorn app.main:app --host 0.0.0.0 --port $PORT --log-level $LOG_LEVEL
+# Handle Log Level
+# 1. Default to INFO if not set
+LOG_LEVEL="${LOG_LEVEL:-INFO}"
+
+# 2. Ensure LOG_LEVEL is UPPERCASE for the Python app (Loguru needs 'INFO')
+# We export this so the Python application (app.config) picks up the uppercase version
+export LOG_LEVEL=$(echo "$LOG_LEVEL" | tr '[:lower:]' '[:upper:]')
+
+# 3. Create a lowercase version specifically for Uvicorn (Uvicorn needs 'info')
+UVICORN_LOG_LEVEL=$(echo "$LOG_LEVEL" | tr '[:upper:]' '[:lower:]')
+
+exec uvicorn app.main:app --host 0.0.0.0 --port $PORT --log-level $UVICORN_LOG_LEVEL
