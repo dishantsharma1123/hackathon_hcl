@@ -1,146 +1,109 @@
-"""Scam detection service using multi-layered approach."""
+"""Scam detection service using specialized BERT model."""
 
-from typing import List, Tuple
-from app.services.llm import llm_service
+from typing import List, Tuple, Dict
+from transformers import pipeline
 from app.utils.patterns import ScamPatterns, extract_matches
 from app.utils.logger import app_logger
 from app.config import settings
 
-
 class ScamDetectionService:
-    """Service for detecting scam intent in messages."""
-
-    # Scam categories
-    SCAM_CATEGORIES = [
-        "financial_fraud",
-        "phishing",
-        "lottery_prize",
-        "tech_support",
-        "romance",
-        "legitimate",
-    ]
-
-    # System prompt for LLM classification
-    CLASSIFICATION_SYSTEM_PROMPT = """You are an expert at detecting scam messages. Analyze the message and classify it into one of the provided categories.
-- financial_fraud: Requests for money, bank details, investment schemes
-- phishing: Suspicious links, credential requests, fake login pages
-- lottery_prize: Claims of winning prizes, lottery scams
-- tech_support: Fake technical support, remote access requests
-- romance: Emotional manipulation leading to financial requests
-- legitimate: Normal, non-scam messages
-"""
+    """Service for detecting scam intent using BERT + Pattern Matching."""
 
     def __init__(self):
         self.threshold = settings.scam_confidence_threshold
-        self.high_threshold = settings.high_confidence_threshold
+        
+        # Initialize the specialized Spam Detection Model
+        # using a 'tiny' BERT model to save memory (~15MB size)
+        app_logger.info("Loading BERT scam detection model...")
+        try:
+            self.classifier = pipeline(
+                "text-classification", 
+                model="mrm8488/bert-tiny-finetuned-sms-spam-detection"
+            )
+            app_logger.info("BERT model loaded successfully.")
+        except Exception as e:
+            app_logger.error(f"Failed to load BERT model: {e}")
+            self.classifier = None
 
     async def detect_scam(self, message: str, conversation_history: List[str] = None) -> Tuple[bool, float, str]:
         """
-        Detect if a message is a scam using multi-layered approach.
-
-        Args:
-            message: The message to analyze
-            conversation_history: Previous messages for context
-
+        Detect if a message is a scam.
+        
         Returns:
             Tuple of (is_scam, confidence, scam_type)
         """
-        # Layer 1: Pattern-based detection (fast)
+        # 1. Run Pattern Detection (to guess the TYPE of scam)
         pattern_score, pattern_type = self._pattern_detection(message)
-        app_logger.debug(f"Pattern detection: score={pattern_score}, type={pattern_type}")
+        
+        # 2. Run BERT Classification (to confirm IF it is a scam)
+        bert_is_scam, bert_confidence = self._bert_analysis(message)
+        
+        app_logger.info(f"Analysis - Pattern: {pattern_score:.2f} ({pattern_type}) | BERT: {bert_confidence:.2f} (Scam: {bert_is_scam})")
 
+        # Decision Logic:
+        # If Pattern is very sure, trust it.
         if pattern_score >= 0.9:
-            # High confidence from patterns
             return True, pattern_score, pattern_type
+            
+        # Otherwise, trust the BERT model for detection
+        is_scam = bert_is_scam and (bert_confidence > self.threshold)
+        
+        # Determine final type
+        # If BERT says scam but patterns didn't find a type, mark as 'general_scam'
+        final_type = pattern_type if (is_scam and pattern_type != "unknown") else "general_scam"
+        if not is_scam:
+            final_type = "legitimate"
 
-        # Layer 2: LLM-based classification (accurate)
-        llm_category, llm_confidence = await self._llm_classification(message, conversation_history)
-        app_logger.debug(f"LLM classification: category={llm_category}, confidence={llm_confidence}")
+        final_confidence = max(pattern_score, bert_confidence) if is_scam else bert_confidence
 
-        # Determine if it's a scam
-        is_scam = llm_category != "legitimate" and llm_confidence >= self.threshold
+        return is_scam, final_confidence, final_type
 
-        # Combine scores
-        combined_confidence = max(pattern_score, llm_confidence)
+    def _bert_analysis(self, message: str) -> Tuple[bool, float]:
+        """Run the BERT spam classifier."""
+        if not self.classifier:
+            return False, 0.0
 
-        return is_scam, combined_confidence, llm_category
+        try:
+            # Truncate to 512 tokens to prevent crash
+            result = self.classifier(message[:512])[0]
+            
+            # This specific model uses 'LABEL_1' for Spam/Scam and 'LABEL_0' for Ham/Legit
+            is_scam = result['label'] == 'LABEL_1'
+            score = result['score']
+            
+            return is_scam, score
+        except Exception as e:
+            app_logger.error(f"BERT prediction error: {e}")
+            return False, 0.0
 
     def _pattern_detection(self, message: str) -> Tuple[float, str]:
         """
-        Detect scam using pattern matching.
-
-        Returns:
-            Tuple of (confidence, scam_type)
+        Detect scam type using keyword patterns.
+        Returns: (confidence, scam_type)
         """
-        message_lower = message.lower()
-        total_score = 0.0
         detected_types = []
+        total_score = 0.0
 
-        # Check each category
         if extract_matches(message, ScamPatterns.URGENCY_PATTERNS):
             total_score += 0.3
-
         if extract_matches(message, ScamPatterns.FINANCIAL_PATTERNS):
             total_score += 0.4
             detected_types.append("financial_fraud")
-
         if extract_matches(message, ScamPatterns.PHISHING_PATTERNS):
             total_score += 0.4
             detected_types.append("phishing")
-
         if extract_matches(message, ScamPatterns.LOTTERY_PATTERNS):
             total_score += 0.4
             detected_types.append("lottery_prize")
-
         if extract_matches(message, ScamPatterns.TECH_SUPPORT_PATTERNS):
             total_score += 0.4
             detected_types.append("tech_support")
-
         if extract_matches(message, ScamPatterns.ROMANCE_PATTERNS):
             total_score += 0.3
             detected_types.append("romance")
 
-        # Cap the score at 1.0
-        total_score = min(total_score, 1.0)
-
         scam_type = detected_types[0] if detected_types else "unknown"
+        return min(total_score, 1.0), scam_type
 
-        return total_score, scam_type
-
-    async def _llm_classification(
-        self,
-        message: str,
-        conversation_history: List[str] = None,
-    ) -> Tuple[str, float]:
-        """
-        Classify message using LLM.
-
-        Returns:
-            Tuple of (category, confidence)
-        """
-        # Build context from history
-        context = ""
-        if conversation_history:
-            context = "\n".join([f"- {msg}" for msg in conversation_history[-5:]])  # Last 5 messages
-            context = f"\nPrevious messages:\n{context}\n\n"
-
-        prompt = f"""{context}Current message: {message}
-
-Classify this message as one of: {", ".join(self.SCAM_CATEGORIES)}
-"""
-
-        category, confidence = await llm_service.classify(
-            text=prompt,
-            categories=self.SCAM_CATEGORIES,
-            system_prompt=self.CLASSIFICATION_SYSTEM_PROMPT,
-        )
-
-        return category, confidence
-
-    def is_high_confidence(self, confidence: float) -> bool:
-        """Check if confidence is above high threshold."""
-        return confidence >= self.high_threshold
-
-
-# Global service instance
+# Global instance
 scam_detection_service = ScamDetectionService()
