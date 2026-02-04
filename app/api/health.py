@@ -15,8 +15,12 @@ async def health_check():
     Returns:
         Health status information
     """
-    # Check LLM connection
-    llm_connected = await llm_service.check_connection()
+    # Check LLM connection with error handling
+    try:
+        llm_connected = await llm_service.check_connection()
+    except Exception as e:
+        app_logger.error(f"Health check LLM connection failed: {e}")
+        llm_connected = False
     
     return {
         "status": "healthy",
