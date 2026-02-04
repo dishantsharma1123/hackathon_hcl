@@ -1,6 +1,6 @@
 """Scam detection service using specialized BERT model and Pattern Matching."""
 
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from transformers import pipeline
 from app.utils.patterns import ScamPatterns, extract_matches
 from app.utils.logger import app_logger
@@ -10,18 +10,16 @@ class ScamDetectionService:
     """Service for detecting scam intent using BERT + Pattern Matching."""
 
     def __init__(self):
-        # Load all configuration from settings
         self.threshold = settings.scam_confidence_threshold
-        self.high_threshold = settings.high_confidence_threshold
-        self.pattern_threshold = settings.pattern_match_threshold
-        self.model_name = settings.scam_model_name
+        # Default high threshold if not in settings
+        self.high_threshold = getattr(settings, "high_confidence_threshold", 0.9)
         
         # Initialize the specialized Spam Detection Model
-        app_logger.info(f"Loading scam detection model: {self.model_name}...")
+        app_logger.info("Loading BERT scam detection model...")
         try:
             self.classifier = pipeline(
                 "text-classification", 
-                model=self.model_name
+                model="mrm8488/bert-tiny-finetuned-sms-spam-detection"
             )
             app_logger.info("BERT model loaded successfully.")
         except Exception as e:
@@ -31,22 +29,32 @@ class ScamDetectionService:
     async def detect_scam(self, message: str, conversation_history: List[str] = None) -> Tuple[bool, float, str]:
         """
         Detect if a message is a scam.
+        
+        Returns:
+            Tuple of (is_scam, confidence, scam_type)
         """
-        # 1. Run Pattern Detection
+        # 1. Run Pattern Detection (to guess the TYPE of scam)
         pattern_score, pattern_type = self._pattern_detection(message)
         
-        # 2. Run BERT Classification
+        # 2. Run BERT Classification (to confirm IF it is a scam)
         bert_is_scam, bert_confidence = self._bert_analysis(message)
         
         app_logger.info(f"Analysis - Pattern: {pattern_score:.2f} ({pattern_type}) | BERT: {bert_confidence:.2f} (Scam: {bert_is_scam})")
 
         # DECISION LOGIC:
         
-        # Rule 1: Trust Patterns if they exceed the configured threshold
-        if pattern_score >= self.pattern_threshold:
-            return True, pattern_score, pattern_type
+        # Rule 1: Trust Patterns for known threats.
+        if pattern_score >= 0.3:
+            # If pattern detected, it IS a scam.
+            # But we want the HIGHEST confidence available.
+            # If BERT also thinks it's a scam with higher confidence, use that.
+            final_confidence = pattern_score
+            if bert_is_scam and bert_confidence > pattern_score:
+                final_confidence = bert_confidence
+                
+            return True, final_confidence, pattern_type
             
-        # Rule 2: Trust BERT for unknown threats
+        # Rule 2: Trust BERT for unknown threats.
         is_scam = bert_is_scam and (bert_confidence > self.threshold)
         
         # Determine final type
@@ -71,7 +79,7 @@ class ScamDetectionService:
             # Truncate to 512 tokens to prevent crash
             result = self.classifier(message[:512])[0]
             
-            # This specific model uses 'LABEL_1' for Spam/Scam
+            # This specific model uses 'LABEL_1' for Spam/Scam and 'LABEL_0' for Ham/Legit
             is_scam = result['label'] == 'LABEL_1'
             score = result['score']
             
@@ -83,26 +91,36 @@ class ScamDetectionService:
     def _pattern_detection(self, message: str) -> Tuple[float, str]:
         """
         Detect scam type using keyword patterns.
+        Returns: (confidence, scam_type)
         """
         detected_types = []
         total_score = 0.0
 
+        # INCREASED SCORES:
+        # We boosted these from 0.4 to 0.6 so they pass the confidence checks (> 0.5)
+        # when a specific scam keyword is found.
+
         if extract_matches(message, ScamPatterns.URGENCY_PATTERNS):
             total_score += 0.3
+        
         if extract_matches(message, ScamPatterns.FINANCIAL_PATTERNS):
-            total_score += 0.4
+            total_score += 0.6  # Was 0.4
             detected_types.append("financial_fraud")
+            
         if extract_matches(message, ScamPatterns.PHISHING_PATTERNS):
-            total_score += 0.4
+            total_score += 0.6  # Was 0.4
             detected_types.append("phishing")
+            
         if extract_matches(message, ScamPatterns.LOTTERY_PATTERNS):
-            total_score += 0.4
+            total_score += 0.6  # Was 0.4
             detected_types.append("lottery_prize")
+            
         if extract_matches(message, ScamPatterns.TECH_SUPPORT_PATTERNS):
-            total_score += 0.4
+            total_score += 0.6  # Was 0.4
             detected_types.append("tech_support")
+            
         if extract_matches(message, ScamPatterns.ROMANCE_PATTERNS):
-            total_score += 0.3
+            total_score += 0.5  # Was 0.3
             detected_types.append("romance")
 
         scam_type = detected_types[0] if detected_types else "unknown"
