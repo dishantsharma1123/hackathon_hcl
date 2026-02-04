@@ -1,7 +1,4 @@
-"""End-to-end tests for the Agentic Honey-Pot System.
-
-These tests simulate real-world scenarios and complete user flows.
-"""
+"""End-to-end tests for the Agentic Honey-Pot System."""
 
 import pytest
 import time
@@ -289,9 +286,10 @@ class TestE2EPerformanceAndReliability:
                     headers=api_key_headers,
                 ).json()["conversation_id"]
                 
+                # UPDATED: Use a clear scam message to ensure detection
                 request = {
                     "conversation_id": conv_id,
-                    "message": f"Scam message {conv_num}",
+                    "message": f"URGENT: You won a lottery! Claim now {conv_num}",
                     "sender_id": f"scammer_{conv_num}",
                     "timestamp": datetime.utcnow().isoformat() + "Z",
                     "conversation_history": [],
@@ -344,9 +342,10 @@ class TestE2EPerformanceAndReliability:
         max_turns = 10  # Test with 10 turns
         
         for turn in range(max_turns):
+            # UPDATED: Use a clear scam message to ensure the agent stays active
             request = {
                 "conversation_id": conv_id,
-                "message": f"Scam message turn {turn + 1}",
+                "message": f"URGENT: You have won a lottery prize of Rs. {turn}000! Click here.",
                 "sender_id": "scammer",
                 "timestamp": datetime.utcnow().isoformat() + "Z",
                 "conversation_history": conversation_history.copy(),

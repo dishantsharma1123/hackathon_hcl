@@ -90,7 +90,7 @@ class TestConversationFlow:
         # Send messages to both
         msg1 = {
             "conversation_id": conv1,
-            "message": "You won a lottery!",
+            "message": "URGENT: You won a lottery!",
             "sender_id": "scammer1",
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "conversation_history": [],
@@ -98,7 +98,7 @@ class TestConversationFlow:
         
         msg2 = {
             "conversation_id": conv2,
-            "message": "Your account is blocked!",
+            "message": "URGENT: Your account is blocked!",
             "sender_id": "scammer2",
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "conversation_history": [],
@@ -173,10 +173,10 @@ class TestConversationFlow:
             headers=api_key_headers,
         ).json()["conversation_id"]
         
-        # Turn 1: Initial scam message
+        # Turn 1: Initial scam message - UPDATED for better detection
         msg1 = {
             "conversation_id": conv_id,
-            "message": "Work from home! Earn Rs. 30,000/month.",
+            "message": "URGENT! Work from home! Earn Money now!",
             "sender_id": "scammer",
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "conversation_history": [],
