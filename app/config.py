@@ -13,22 +13,29 @@ class Settings(BaseSettings):
     api_port: int = 8000
 
     # LLM Provider Configuration
-    llm_provider: str = "openrouter"  # Options: "ollama", "openrouter"
+    llm_provider: str = "openrouter"
     
-    # Ollama Configuration (used when llm_provider="ollama")
+    # Ollama Configuration
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3.1"
     ollama_fallback_model: str = "mistral"
     
-    # OpenRouter Configuration (used when llm_provider="openrouter")
+    # OpenRouter Configuration
     openrouter_api_key: Optional[str] = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "meta-llama/llama-3.1-8b-instruct:free"
     openrouter_fallback_model: str = "mistralai/mistral-7b-instruct:free"
 
-    # Detection Thresholds
+    # --- NEW: Detection Configuration ---
+    # The BERT model to use for scam detection
+    scam_model_name: str = "mrm8488/bert-tiny-finetuned-sms-spam-detection"
+    
+    # Confidence thresholds
     scam_confidence_threshold: float = 0.7
     high_confidence_threshold: float = 0.9
+    
+    # Pattern matching threshold (if patterns score higher than this, it's a scam)
+    pattern_match_threshold: float = 0.3
 
     # Agent Configuration
     max_conversation_turns: int = 20
