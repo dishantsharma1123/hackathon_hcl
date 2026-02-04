@@ -1,26 +1,45 @@
 #!/bin/bash
 
-# Start script for Agentic Honey-Pot System
+# Start script for Agentic Honey-Pot System (Hobby Plan Optimized)
 
 set -e
 
 echo "Starting Agentic Honey-Pot System..."
 
-# Start FastAPI application
+# -----------------------------------------------------
+# 1. Start Ollama in the background
+# -----------------------------------------------------
+echo "Starting Ollama service..."
+ollama serve &
+
+# Wait for Ollama to be ready
+echo "Waiting for Ollama to start..."
+while ! curl -s http://localhost:11434 > /dev/null; do
+    sleep 1
+done
+echo "Ollama is active!"
+
+# -----------------------------------------------------
+# 2. Pull the "Tiny" Model
+# -----------------------------------------------------
+# Default to 'tinyllama' if not set. It is small (~600MB) and safe for Hobby plans.
+# Alternative: 'qwen2:0.5b' is even smaller (~350MB).
+OLLAMA_MODEL="${OLLAMA_MODEL:-tinyllama}"
+
+echo "Checking/Pulling model: $OLLAMA_MODEL..."
+ollama pull $OLLAMA_MODEL
+echo "Model $OLLAMA_MODEL ready."
+
+# -----------------------------------------------------
+# 3. Start FastAPI server
+# -----------------------------------------------------
 echo "Starting FastAPI server..."
 
-# Use PORT provided by Railway, default to 8000 if not set
 PORT="${PORT:-8000}"
 
-# Handle Log Level
-# 1. Default to INFO if not set
+# Ensure Loguru uses UPPERCASE 'INFO' and Uvicorn uses lowercase 'info'
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
-
-# 2. Ensure LOG_LEVEL is UPPERCASE for the Python app (Loguru needs 'INFO')
-# We export this so the Python application (app.config) picks up the uppercase version
 export LOG_LEVEL=$(echo "$LOG_LEVEL" | tr '[:lower:]' '[:upper:]')
-
-# 3. Create a lowercase version specifically for Uvicorn (Uvicorn needs 'info')
 UVICORN_LOG_LEVEL=$(echo "$LOG_LEVEL" | tr '[:upper:]' '[:lower:]')
 
 exec uvicorn app.main:app --host 0.0.0.0 --port $PORT --log-level $UVICORN_LOG_LEVEL

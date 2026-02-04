@@ -1,44 +1,30 @@
-# Multi-stage Dockerfile for Agentic Honey-Pot System
-
-# Stage 1: Base image with Ollama
-FROM ollama/ollama:latest as ollama-base
-
-# Stage 2: Python application
+# Use python 3.11 slim to save space
 FROM python:3.11-slim
 
-# Install system dependencies
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies (curl is needed for Ollama)
 RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
-WORKDIR /app
+# Install Ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
 
-# Copy requirements first for better caching
+# Copy requirements and install dependencies
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy project files
 COPY . .
 
-# Create logs directory
-RUN mkdir -p logs
+# Make scripts executable
+RUN chmod +x scripts/*.sh
 
-# Expose port
-EXPOSE 8000
-
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV OLLAMA_HOST=http://localhost:11434
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Start script
-COPY scripts/start.sh /start.sh
-RUN chmod +x /start.sh
-
-CMD ["/start.sh"]
+# Run the start script
+CMD ["./scripts/start.sh"]
